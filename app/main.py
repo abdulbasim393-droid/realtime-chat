@@ -3,7 +3,7 @@ from app.schemas import UserCreate, UserResponse, UserLogin
 from app.database import Base, engine, get_db
 from sqlalchemy.orm import Session
 from app.models import User
-from app.security import hash_password, verify_password
+from app.security import hash_password, verify_password, create_access_token
 
 
 
@@ -45,10 +45,13 @@ def login(
             detail="Invalid credentials"
         )
 
+    access_token = create_access_token(
+    {"sub": user.email}
+    )
     return {
-        "message": "Login successful"
+    "access_token": access_token,
+    "token_type": "bearer"
     }
-
 
 
 @app.get("/messages")
