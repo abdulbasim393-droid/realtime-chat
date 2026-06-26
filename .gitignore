@@ -18,3 +18,8 @@ alembic/versions/*.pyc
 # OS files
 .DS_Store
 Thumbs.db
+
+.python-version
+pyproject.toml
+uv.lock
+README.md
