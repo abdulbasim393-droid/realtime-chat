@@ -30,3 +30,18 @@ class ConversationResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+
+
+class MessageCreate(BaseModel):
+    content: str
+
+
+
+class MessageResponse(BaseModel):
+    id: int
+    content: str
+
+    class Config:
+        from_attributes = True

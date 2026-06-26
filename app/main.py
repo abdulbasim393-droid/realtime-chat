@@ -1,8 +1,16 @@
 from fastapi import FastAPI, Depends, HTTPException
-from app.schemas import UserCreate, UserResponse, UserLogin, ConversationCreate, ConversationResponse
+from app.schemas import(
+    UserCreate, 
+    UserResponse, 
+    UserLogin, 
+    ConversationCreate, 
+    ConversationResponse,
+    MessageCreate,
+    MessageResponse
+    )
 from app.database import Base, engine, get_db
 from sqlalchemy.orm import Session
-from app.models import User, Conversation
+from app.models import User, Conversation, Message
 from app.security import hash_password, verify_password, create_access_token
 from app.security import (
     oauth2_scheme,
@@ -26,11 +34,15 @@ def home():
 
 
 
+
+
+
+
 @app.post("/login", response_model=UserLogin)
 def login(
     form_data: OAuth2PasswordRequestForm = Depends(),
     db: Session = Depends(get_db)
-):
+    ):
     user = (
         db.query(User)
         .filter(User.email == form_data.username)
@@ -65,7 +77,7 @@ def login(
 def get_messages(
     page: int = 1,
     limit: int = 20
-):
+    ):
     return {
         "page": page,
         "limit": limit
@@ -82,7 +94,7 @@ def test_db(db: Session = Depends(get_db)):
 def create_user(
     user: UserCreate,
     db: Session = Depends(get_db)
-):
+    ):
     db_user = User(
         username=user.username,
         email=user.email,
@@ -100,7 +112,7 @@ def create_user(
 @app.get("/users")
 def get_users(
     db: Session = Depends(get_db)
-):
+    ):
     return db.query(User).all()
 
 
@@ -108,7 +120,7 @@ def get_users(
 def get_user(
     user_id: int,
     db: Session = Depends(get_db)
-):
+    ):
     user = (
         db.query(User)
         .filter(User.id == user_id)
@@ -127,7 +139,7 @@ def get_user(
 def get_current_user(
     token: str = Depends(oauth2_scheme),
     db: Session = Depends(get_db)
-):
+    ):
     email = verify_access_token(token)
 
     if not email:
@@ -154,7 +166,7 @@ def get_current_user(
 @app.get("/me", response_model=UserResponse)
 def me(
     current_user: User = Depends(get_current_user)
-):
+    ):
     return current_user
 
 
@@ -164,7 +176,7 @@ def me(
 def create_conversation(
     conversation: ConversationCreate,
     db: Session = Depends(get_db)
-):
+    ):
     db_conversation = Conversation(
         name=conversation.name
     )
@@ -174,3 +186,33 @@ def create_conversation(
     db.refresh(db_conversation)
 
     return db_conversation
+
+
+@app.post(
+    "/conversations/{conversation_id}/messages",
+    response_model=MessageResponse
+    )
+
+def create_message(
+    conversation_id: int,
+    message: MessageCreate,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+    ):
+    conversation = (
+        db.query(Conversation)
+        .filter(Conversation.id == conversation_id)
+        .first()
+        )
+    if not conversation:
+        raise HTTPException(
+            status_code=404,
+            detail="Conversation not found"
+        )
+    new_message = Message(
+    content=message.content
+    )
+
+    new_message.user = current_user
+    new_message.conversation = conversation
+

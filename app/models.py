@@ -1,5 +1,5 @@
-from sqlalchemy import Column, Integer, String, ForeignKey
-
+from sqlalchemy import Column, Integer, String, ForeignKey, DateTime
+from datetime import datetime, timezone
 from app.database import Base
 from sqlalchemy.orm import relationship
 
@@ -59,4 +59,9 @@ class Message(Base):
     conversation = relationship(
         "Conversation",
         back_populates="messages"
+    )
+
+    created_at = Column(
+    DateTime(timezone=True),
+    default=lambda: datetime.now(timezone.utc),
     )
