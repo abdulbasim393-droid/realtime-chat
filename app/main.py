@@ -8,7 +8,7 @@ from app.schemas import(
     MessageCreate,
     MessageResponse
     )
-from app.database import Base, engine, get_db
+from app.database import Base, engine, get_db, SessionLocal
 from sqlalchemy.orm import Session
 from app.models import User, Conversation, Message
 from app.security import hash_password, verify_password, create_access_token
@@ -268,17 +268,75 @@ def get_messages(
 
 
 
-@app.websocket("/ws")
+@app.websocket("/ws/{conversation_id}")
 async def websocket_endpoint(
-    websocket: WebSocket
-):
-    await manager.connect(websocket)
+    websocket: WebSocket,
+    conversation_id: int
+    ):
+    await manager.connect(
+        conversation_id,
+        websocket
+        )
+
+    db = SessionLocal()
 
     try:
         while True:
-            data = await websocket.receive_text()
+            data = await websocket.receive_json()
+            token = data["token"]
+            content = data["content"]
 
-            await manager.broadcast(data)
+            email = verify_access_token(token)
+            if not email:
+                await websocket.close()
+                break
+
+            user = (
+                db.query(User)
+                .filter(User.email == email)
+                .first()
+            )
+
+            if not user:
+                await websocket.close()
+                break
+
+            conversation = (
+                db.query(Conversation)
+                .filter(Conversation.id == conversation_id)
+                .first()
+                )
+
+            if not conversation:
+                await websocket.close()
+                break
+
+            new_message = Message(
+                 content=content
+                )
+
+            new_message.user = user
+            new_message.conversation = conversation
+
+            db.add(new_message)
+            db.commit()
+            db.refresh(new_message)
+
+            await manager.broadcast(
+                conversation_id,
+                {
+                    "id": new_message.id,
+                    "content": new_message.content,
+                    "username": user.username,
+                    "created_at": new_message.created_at.isoformat()
+                }
+            )
 
     except WebSocketDisconnect:
-        manager.disconnect(websocket)
+        manager.disconnect(
+            conversation_id,
+            websocket
+        )
+
+    finally:
+        db.close()
