@@ -2,7 +2,7 @@ from fastapi import FastAPI, Depends, HTTPException
 from app.schemas import(
     UserCreate, 
     UserResponse, 
-    UserLogin, 
+    Token, 
     ConversationCreate, 
     ConversationResponse,
     MessageCreate,
@@ -18,7 +18,6 @@ from app.security import (
     
     )
 
-from fastapi import HTTPException
 from fastapi.security import OAuth2PasswordRequestForm
 
 
@@ -38,7 +37,7 @@ def home():
 
 
 
-@app.post("/login", response_model=UserLogin)
+@app.post("/login", response_model=Token)
 def login(
     form_data: OAuth2PasswordRequestForm = Depends(),
     db: Session = Depends(get_db)
@@ -191,28 +190,45 @@ def create_conversation(
 @app.post(
     "/conversations/{conversation_id}/messages",
     response_model=MessageResponse
-    )
-
+)
 def create_message(
     conversation_id: int,
     message: MessageCreate,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
-    ):
+):
     conversation = (
         db.query(Conversation)
         .filter(Conversation.id == conversation_id)
         .first()
-        )
+    )
+
     if not conversation:
         raise HTTPException(
             status_code=404,
             detail="Conversation not found"
         )
+
     new_message = Message(
-    content=message.content
+        content=message.content
     )
 
     new_message.user = current_user
     new_message.conversation = conversation
 
+    db.add(new_message)
+    db.commit()
+    db.refresh(new_message)
+
+    return new_message
+
+
+
+@app.get(
+    "/conversations",
+    response_model=list[ConversationResponse]
+)
+def get_conversations(
+    db: Session = Depends(get_db)
+):
+    return db.query(Conversation).all()
