@@ -19,6 +19,8 @@ from app.security import (
     )
 
 from fastapi.security import OAuth2PasswordRequestForm
+from fastapi import WebSocket, WebSocketDisconnect
+from app.websocket_manager import manager
 
 
 
@@ -232,3 +234,51 @@ def get_conversations(
     db: Session = Depends(get_db)
 ):
     return db.query(Conversation).all()
+
+
+
+@app.get(
+    "/conversations/{conversation_id}/messages",
+    response_model=list[MessageResponse]
+)
+def get_messages(
+    conversation_id: int,
+    db: Session = Depends(get_db)
+):
+    conversation = (
+        db.query(Conversation)
+        .filter(Conversation.id == conversation_id)
+        .first()
+    )
+
+    if not conversation:
+        raise HTTPException(
+            status_code=404,
+            detail="Conversation not found"
+        )
+
+    messages = (
+        db.query(Message)
+        .filter(Message.conversation_id == conversation_id)
+        .order_by(Message.created_at)
+        .all()
+    )
+
+    return messages
+
+
+
+@app.websocket("/ws")
+async def websocket_endpoint(
+    websocket: WebSocket
+):
+    await manager.connect(websocket)
+
+    try:
+        while True:
+            data = await websocket.receive_text()
+
+            await manager.broadcast(data)
+
+    except WebSocketDisconnect:
+        manager.disconnect(websocket)
