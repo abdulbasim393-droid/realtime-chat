@@ -32,13 +32,18 @@ class ConnectionManager:
     ):
         await websocket.send_text(message)
 
-    async def broadcast(
-            self,
-            conversation_id: int,
-            message
-            ):
-         for connection in self.active_connections.get(conversation_id, []):
-             await connection.send_text(message)
+    async def broadcast(self, conversation_id: int, message):
+        dead_connections = []
+        print("Connections:", len(self.active_connections.get(conversation_id, [])))
+
+        for connection in self.active_connections.get(conversation_id, []):
+            try:
+                await connection.send_json(message)
+            except Exception:
+                dead_connections.append(connection)
+                print("Sending to:", connection.client)
+        for connection in dead_connections:
+            self.disconnect(conversation_id, connection)
 
 
 manager = ConnectionManager()

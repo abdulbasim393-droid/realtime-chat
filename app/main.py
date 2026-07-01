@@ -21,6 +21,8 @@ from app.security import (
 from fastapi.security import OAuth2PasswordRequestForm
 from fastapi import WebSocket, WebSocketDisconnect
 from app.websocket_manager import manager
+from app.tasks import long_task
+
 
 
 
@@ -340,3 +342,14 @@ async def websocket_endpoint(
 
     finally:
         db.close()
+
+
+
+@app.post("/background-task")
+def background_task():
+    task = long_task.delay()
+
+    return {
+        "message": "Task started",
+        "task_id": task.id
+    }
